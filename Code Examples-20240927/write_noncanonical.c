@@ -79,8 +79,8 @@ int main(int argc, char *argv[])
 
     // Set input mode (non-canonical, no echo,...)
     newtio.c_lflag = 0;
-    newtio.c_cc[VTIME] = 0; // Inter-character timer unused
-    newtio.c_cc[VMIN] = 5;  // Blocking read until 5 chars received
+    newtio.c_cc[VTIME] = 1; // Inter-character timer unused
+    newtio.c_cc[VMIN] = 0;  // Blocking read until 5 chars received
 
     // VTIME e VMIN should be changed in order to protect with a
     // timeout the reception of the following character(s)
@@ -103,6 +103,7 @@ int main(int argc, char *argv[])
 
     // Create string to send
     unsigned char buf[5] = {0};
+    unsigned char buf2[5] = {0};
 
     //create set message
     unsigned char flag = 0x7E;
@@ -123,18 +124,31 @@ int main(int argc, char *argv[])
     // The whole buffer must be sent even with the '\n'.
     //buf[5] = '\n';
 
+    
+
     (void)signal(SIGALRM, alarmHandler);
+    int bytes_read = 0;
 
     while (alarmCount < 4)
     {
+        
         if (alarmEnabled == FALSE)
         {
+            int bytes = write(fd, buf, 5);
+            printf("%d bytes written\n", bytes);
+            bytes_read = read(fd, buf2, 5);
+            if (bytes_read == 5){
+                printf("%d bytes read\n", bytes_read);
+                alarm(0);
+                break;
+            }
+            
             alarm(3); // Set alarm to be triggered in 3s
             alarmEnabled = TRUE;
         }
+
     }
-    int bytes = write(fd, buf, 5);
-    printf("%d bytes written\n", bytes);
+    
 
     // Wait until all bytes have been written to the serial port
     sleep(1);
