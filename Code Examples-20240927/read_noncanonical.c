@@ -18,8 +18,18 @@
 
 #define FALSE 0
 #define TRUE 1
-
 #define BUF_SIZE 256
+
+enum receiver_state{
+    start = 0,
+    flag_rcv = 1,
+    a_rcv = 2,
+    c_rcv = 3,
+    bcc_ok = 4,
+    stop = 5,
+};
+
+enum receiver_state state = start;
 
 volatile int STOP = FALSE;
 
@@ -92,27 +102,95 @@ int main(int argc, char *argv[])
     unsigned char buf[5] = {0}; // +1: Save space for the final '\0' char
     unsigned char buf2[5] = {0};
 
+    unsigned char address;
+    unsigned char control;
+    int bytes;
 
-    while (STOP == FALSE)
+    bytes = read(fd, buf, 5);
+    while (state != stop)
     {
-        // Returns after 5 chars have been input
-        int bytes = read(fd, buf, BUF_SIZE);
-        printf("Flag = 0x%02X\n", buf[0]);
-        buf2[0] = buf[0];
-        printf("Flag = 0x%02X\n", buf[1]);
-        buf2[1] = buf[1];
-        printf("Flag = 0x%02X\n", buf[2]);
-        buf2[2] = buf[2];
-        printf("Flag = 0x%02X\n", buf[3]);
-        buf2[3] = buf[3];
-        printf("Flag = 0x%02X\n", buf[4]);
-        buf2[4] = buf[4];
+        switch (state){
+            case start:
+                if (buf[0] == 0x7E){
 
-        if(buf[0] == 0x7E && buf[1] == 0x03 && buf[2] == 0x03)
+                    printf("Flag = 0x%02X\n", buf[0]);
+                    state = flag_rcv;
+                    buf2[0] = buf[0];
+                }
+                
+                break;
+
+            case flag_rcv:
+                
+                if (buf[1] == 0x03){
+                    printf("A = 0x%02X\n", buf[0]);
+                    address = buf[0];
+                    state = a_rcv;
+                    buf2[1] = buf[1];
+                }
+                if (buf[1] == 0x7E){
+                    printf("Flag = 0x%02X\n", buf[1]);
+                    state = flag_rcv;
+                }
+                else {
+                    state = start;
+                }
+                break;
+
+            case a_rcv:
+                
+                if (buf[2] == 0x03){
+                    printf("C = 0x%02X\n", buf[2]);
+                    control = buf[2];
+                    state = c_rcv;
+                    buf2[2] = buf[2];
+                }
+                if (buf[2] == 0x7E){
+                    printf("Flag = 0x%02X\n", buf[2]);
+                    
+                    state = flag_rcv;
+                }
+                else {
+                    state = start;
+                }
+                break;
+            case c_rcv:
+                
+                if (buf[3] == address ^ control){
+                    printf("BCC = 0x%02X\n", buf[3]);
+                    state = bcc_ok;
+                    buf2[3] = buf[3];
+                }
+                if (buf[3] == 0x7E){
+                    printf("Flag = 0x%02X\n", buf[3]);
+                    state = flag_rcv;
+                }
+                else {
+                    state = start;
+                }
+                break;
+            case bcc_ok:
+                
+                if (buf[4] == 0x7E){
+                    printf("FLAG = 0x%02X\n", buf[4]);
+                    state = stop;
+                    buf2[4] = buf[4];
+                }
+                else {
+                    state = start;
+                }
+                break;
+
+        }
+
+    }
+
+    if(buf[0] == 0x7E && buf[1] == 0x03 && buf[2] == 0x03)
         {
+            bytes = write(fd, buf2, 5);
+            printf("%d bytes written\n", bytes);
             STOP = TRUE;
         }
-    }
 
     // The while() cycle should be changed in order to respect the specifications
     // of the protocol indicated in the Lab guide
