@@ -18,7 +18,7 @@
 
 #define FALSE 0
 #define TRUE 1
-#define BUF_SIZE 256
+#define temp_SIZE 256
 
 enum receiver_state{
     start = 0,
@@ -99,85 +99,99 @@ int main(int argc, char *argv[])
     printf("New termios structure set\n");
 
     // Loop for input
-    unsigned char buf[5] = {0}; // +1: Save space for the final '\0' char
-    unsigned char buf2[5] = {0};
+    unsigned char temp[1] = {0}; // +1: Save space for the final '\0' char
+    unsigned char buf[5] = {0};
 
     unsigned char address;
     unsigned char control;
-    int bytes;
+    int byte, bytes;
 
-    bytes = read(fd, buf, 5);
+    
     while (state != stop)
     {
+        byte = read(fd, temp, 1);
         switch (state){
             case start:
-                if (buf[0] == 0x7E){
+                if (temp[0] == 0x7E){
 
-                    printf("Flag = 0x%02X\n", buf[0]);
+                    printf("Flag = 0x%02X\n", temp[0]);
                     state = flag_rcv;
-                    buf2[0] = buf[0];
+                    printf("state = FLAG \n");
+                    buf[0] = temp[0];
                 }
                 
                 break;
 
             case flag_rcv:
                 
-                if (buf[1] == 0x03){
-                    printf("A = 0x%02X\n", buf[0]);
-                    address = buf[0];
+                if (temp[0] == 0x03){
+                    printf("A = 0x%02X\n", temp[0]);
+                    address = temp[0];
                     state = a_rcv;
-                    buf2[1] = buf[1];
+                    printf("state = A \n");
+                    buf[1] = temp[0];
                 }
-                if (buf[1] == 0x7E){
-                    printf("Flag = 0x%02X\n", buf[1]);
+
+                else if (temp[0] == 0x7E){
+                    printf("Flag = 0x%02X\n", temp[0]);
                     state = flag_rcv;
+                    printf("state = FLAG \n");
                 }
                 else {
                     state = start;
+                    printf("state = START \n");
                 }
                 break;
 
             case a_rcv:
                 
-                if (buf[2] == 0x03){
-                    printf("C = 0x%02X\n", buf[2]);
-                    control = buf[2];
+                if (temp[0] == 0x03){
+                    printf("C = 0x%02X\n", temp[0]);
+                    control = temp[0];
                     state = c_rcv;
-                    buf2[2] = buf[2];
+                    printf("state = C \n");
+                    buf[2] = temp[0];
                 }
-                if (buf[2] == 0x7E){
-                    printf("Flag = 0x%02X\n", buf[2]);
+                else if (temp[0] == 0x7E){
+                    printf("Flag = 0x%02X\n", temp[0]);
                     
                     state = flag_rcv;
+                    printf("state = FLAG \n");
                 }
                 else {
                     state = start;
+                    printf("state = START \n");
                 }
                 break;
             case c_rcv:
                 
-                if (buf[3] == address ^ control){
-                    printf("BCC = 0x%02X\n", buf[3]);
+                if (temp[0] == address ^ control){
+                    printf("BCC = 0x%02X\n", temp[0]);
                     state = bcc_ok;
-                    buf2[3] = buf[3];
+                    printf("state = BCC \n");
+                    buf[3] = temp[0];
                 }
-                if (buf[3] == 0x7E){
-                    printf("Flag = 0x%02X\n", buf[3]);
+                else if (temp[0] == 0x7E){
+                    printf("Flag = 0x%02X\n", temp[0]);
                     state = flag_rcv;
+                    printf("state = FLAG \n");
                 }
                 else {
                     state = start;
+                    printf("state = START \n");
                 }
                 break;
             case bcc_ok:
                 
-                if (buf[4] == 0x7E){
-                    printf("FLAG = 0x%02X\n", buf[4]);
+                if (temp[0] == 0x7E){
+                    printf("FLAG = 0x%02X\n", temp[0]);
                     state = stop;
-                    buf2[4] = buf[4];
+                    printf("state = STOP \n");
+                    buf[4] = temp[0];
                 }
                 else {
                     state = start;
+                    printf("state = START \n");
                 }
                 break;
 
@@ -185,9 +199,9 @@ int main(int argc, char *argv[])
 
     }
 
-    if(buf[0] == 0x7E && buf[1] == 0x03 && buf[2] == 0x03)
+    if(buf[0] == 0x7E && buf[1] == 0x03 && buf[2] == 0x03 && (buf [3] == address ^ control) && buf[4] == 0x7E)
         {
-            bytes = write(fd, buf2, 5);
+            bytes = write(fd, buf, 5);
             printf("%d bytes written\n", bytes);
             STOP = TRUE;
         }
