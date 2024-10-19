@@ -200,9 +200,60 @@ int llwrite(const unsigned char *buf, int bufSize)
 ////////////////////////////////////////////////
 int llread(unsigned char *packet)
 {
-    // TODO
+    unsigned char temp[1] = {0};
+    unsigned char bcc2 = 0;
+    unsigned char index = 0;
+    state = start;
 
+    while(state != stop)
+    {
+        readByte(temp);
+        switch(state)
+        {
+            case start:
+                if(temp[0] == FLAG)
+                {
+                    
+                }
+        }
+    }
     return 0;
+}
+
+void sendRR(int sequence){
+    unsigned char buf[5] = {0};
+    buf[0] = FLAG;
+    buf[1] = RX_ADDRESS;
+
+    if(sequence == 0)
+        buf[2] = RR0_FRAME;
+    else
+        buf[2] = RR1_FRAME;
+
+    buf[3] = buf[1] ^ buf[2];
+    buf[4] = FLAG;
+    
+
+    writeBytes(buf, 5);
+    printf("Sent RR%d\n", sequence);
+}
+
+void sendREJ(int sequence){
+    unsigned char buf[5] = {0};
+    buf[0] = FLAG;
+    buf[1] = RX_ADDRESS;
+
+    if(sequence == 0)
+        buf[2] = REJ0_FRAME;
+    else
+        buf[2] = REJ0_FRAME;
+
+    buf[3] = buf[1] ^ buf[2];
+    buf[4] = FLAG;
+    
+
+    writeBytes(buf, 5);
+    printf("Sent REJ%d\n", sequence);
 }
 
 ////////////////////////////////////////////////
