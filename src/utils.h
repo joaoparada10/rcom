@@ -11,6 +11,7 @@
 #define REJ0_FRAME 0x54
 #define REJ1_FRAME 0x55
 #define DISC_FRAME 0x0B
+#define MAX_SIZE (MAX_PAYLOAD_SIZE + 10)
 
 enum state{
     start = 0,

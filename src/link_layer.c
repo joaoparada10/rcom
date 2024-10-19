@@ -202,23 +202,93 @@ int llwrite(const unsigned char *buf, int bufSize)
 ////////////////////////////////////////////////
 int llread(unsigned char *packet)
 {
-    unsigned char temp[1] = {0};
-    unsigned char bcc2 = 0;
-    unsigned char index = 0;
-    state = start;
+    enum state currentState = start;
+    unsigned char byte, A, C, BCC1, BCC2;
+    unsigned char buf[MAX_SIZE];
+    int dataSize = 0;
 
-    while(state != stop)
-    {
-        readByte(temp);
-        switch(state)
-        {
+    while(currentState != stop){
+        int res = readByte(buf);
+        if(res == -1){
+            perror("Erro ao ler byte em llread!");
+        }
+
+        switch(currentState){
             case start:
-                if(temp[0] == FLAG)
-                {
-                    
+                if(byte == FLAG){
+                    currentState = flag_rcv;
                 }
+                break;
+            case flag_rcv:
+                if(byte == TX_ADDRESS || byte == RX_ADDRESS){
+                    A = byte;
+                    currentState = a_rcv;
+                } else if(byte != FLAG){
+                    currentState = start;
+                }
+                break;
+
+            case a_rcv:
+                if(byte == SET_FRAME || byte == UA_FRAME || byte == DISC_FRAME || byte == RR0_FRAME ||
+                byte == RR1_FRAME || byte == REJ0_FRAME || byte == REJ1_FRAME || (byte & 0x01) == 0){
+                    C = byte;
+                    currentState = c_rcv;
+                } else if(byte == FLAG){
+                    currentState = flag_rcv;
+                } else {
+                    currentState = start;
+                }
+                break;
+            
+            case c_rcv:
+                BCC1 = A ^ C;
+                if(byte == BCC1){
+                    currentState = bcc_ok;
+                } else if(byte == FLAG){
+                    currentState = flag_rcv;
+                } else {
+                    currentState = start;
+                }
+                break;
+
+            case bcc_ok:
+                if((C & 0x01) == 0){
+                    buf[dataSize++] = byte;
+                    currentState = stop;
+                }
+                else if(byte == FLAG){
+                    currentState = stop;
+                } else {
+                    buf[dataSize++] = byte;
+                }
+                break;
+            case stop:
+                if(C == UA_FRAME || C == SET_FRAME || C == DISC_FRAME){
+                    return 0;
+                } else if((C & 0x01) == 0){
+                    BCC2 = 0;
+                    for(int i = 0; i < dataSize; i++){
+                        BCC2 ^= buf[i];
+                    }
+
+                    if(BCC2 == byte){
+                        sendRR();
+                        mcmcpy(packet, buf, dataSize);
+                        
+                        return dataSize;
+                    } else {
+                        sendREJ();
+
+                        return -1;
+                    }
+                }
+                break;
+            default:
+                currentState = start;
+                break;
         }
     }
+
     return 0;
 }
 
