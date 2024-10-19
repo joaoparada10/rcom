@@ -13,6 +13,7 @@ volatile int STOP = FALSE;
 int alarmEnabled = FALSE;
 int alarmCount = 0;
 enum state state = start;
+LinkLayer globalConnectionParameters;
 
 
 int supervision_frame_check(unsigned char address, unsigned char control){
@@ -122,6 +123,7 @@ int supervision_frame_check(unsigned char address, unsigned char control){
 ////////////////////////////////////////////////
 int llopen(LinkLayer connectionParameters)
 {
+    globalConnectionParameters = connectionParameters;
 
     unsigned char flag, address, control, bcc;
 
@@ -261,13 +263,62 @@ void sendREJ(int sequence){
 ////////////////////////////////////////////////
 int llclose(int showStatistics)
 {
-    // TODO
+    int clstat;
 
-    int clstat = closeSerialPort();
+    if(globalConnectionParameters.role == LlRx){
+        if(supervision_frame_check(TX_ADDRESS, DISC_FRAME)){
+            unsigned char buf[5];
+            buf[0] = FLAG;
+            buf[1] = RX_ADDRESS;
+            buf[2] = DISC_FRAME;
+            buf[3] = buf[1] ^ buf[2];
+            buf[4] = FLAG;
+
+            writeBytes(buf, 5);
+
+            if(supervision_frame_check(TX_ADDRESS, UA_FRAME)){
+                clstat = closeSerialPort();
+                return clstat;
+            }
+        }
+    }
+    else if(globalConnectionParameters.role == LlTx){
+        unsigned char buf[5];
+        buf[0] = FLAG;
+        buf[1] = TX_ADDRESS;
+        buf[2] = DISC_FRAME;
+        buf[3] = buf[1] ^ buf[2]; 
+        buf[4] = FLAG;
+
+        (void)signal(SIGALRM, alarmHandler);
+        alarmEnabled = FALSE;
+        alarmCount = 0;
+
+        while(alarmCount < 4){
+            if(alarmEnabled == FALSE){
+                writeBytes(buf,5);
+
+                if(supervision_frame_check(RX_ADDRESS, DISC_FRAME)){
+                    buf[0] = FLAG;
+                    buf[1] = TX_ADDRESS;
+                    buf[2] = UA_FRAME;
+                    buf[3] = buf[1] ^ buf[2];
+                    buf[4] = FLAG;
+
+                    writeBytes(buf,5);
+                    
+                    clstat = closeSerialPort();
+                    return clstat;
+                }
+
+                alarm(3);
+                alarmEnabled = TRUE;
+            }
+        }
+    }
+    clstat = closeSerialPort();
     return clstat;
 }
-
-
 
 
 void alarmHandler(int signal)
