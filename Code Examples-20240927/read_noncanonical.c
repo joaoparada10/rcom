@@ -25,7 +25,7 @@ enum receiver_state{
     flag_rcv = 1,
     a_rcv = 2,
     c_rcv = 3,
-    bcc_ok = 4,
+    bcc1_ok = 4,
     stop = 5,
 };
 
@@ -167,7 +167,7 @@ int main(int argc, char *argv[])
                 
                 if (temp[0] == address ^ control){
                     printf("BCC = 0x%02X\n", temp[0]);
-                    state = bcc_ok;
+                    state = bcc1_ok;
                     printf("state = BCC \n");
                     buf[3] = temp[0];
                 }
@@ -181,7 +181,7 @@ int main(int argc, char *argv[])
                     printf("state = START \n");
                 }
                 break;
-            case bcc_ok:
+            case bcc1_ok:
                 
                 if (temp[0] == 0x7E){
                     printf("FLAG = 0x%02X\n", temp[0]);

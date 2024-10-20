@@ -1,6 +1,21 @@
 #ifndef _UTILS_H_
 #define _UTILS_H_
 
+// Application layer macros
+#define START 1
+#define DATA 2
+#define END 3
+#define FILE_SIZE 0
+#define FILE_NAME 1
+
+// SIZE of maximum acceptable payload.
+// Maximum number of bytes that application layer should send to link layer
+#define MAX_PAYLOAD_SIZE 1000
+
+// Link layer macros
+#define ERROR -1
+#define ACK 0
+#define REJECTED 1
 #define FLAG 0x7E
 #define TX_ADDRESS 0x03
 #define RX_ADDRESS 0x01
@@ -8,9 +23,14 @@
 #define UA_FRAME 0x07
 #define RR0_FRAME 0xAA
 #define RR1_FRAME 0xAB
+#define FRAME_0 0x00
+#define FRAME_1 0x80
 #define REJ0_FRAME 0x54
 #define REJ1_FRAME 0x55
 #define DISC_FRAME 0x0B
+#define ESC 0x7D
+#define FLAG_ESC 0x5E
+#define ESC_ESC 0x5D
 #define MAX_SIZE (MAX_PAYLOAD_SIZE + 10)
 
 enum state{
@@ -18,9 +38,19 @@ enum state{
     flag_rcv = 1,
     a_rcv = 2,
     c_rcv = 3,
-    bcc_ok = 4,
-    stop = 5,
+    bcc1_ok = 4,
+    bcc2_ok = 5,
+    stop = 6,
+    rejected = 7,
 };
+
+typedef struct {
+  unsigned char control;
+  unsigned char sequence_number;
+  unsigned char l1;
+  unsigned char l2;
+  unsigned char data[MAX_PAYLOAD_SIZE]
+} dataPacket;
 
 
 #endif 
