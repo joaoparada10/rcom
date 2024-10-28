@@ -13,9 +13,6 @@
 #define MAX_PAYLOAD_SIZE 1000
 
 // Link layer macros
-#define ERROR -1
-#define ACK 0
-#define REJECTED 1
 #define FLAG 0x7E
 #define TX_ADDRESS 0x03
 #define RX_ADDRESS 0x01
@@ -23,15 +20,22 @@
 #define UA_FRAME 0x07
 #define RR0_FRAME 0xAA
 #define RR1_FRAME 0xAB
-#define FRAME_0 0x00
-#define FRAME_1 0x80
+#define IFRAME_0 0x00
+#define IFRAME_1 0x80
 #define REJ0_FRAME 0x54
 #define REJ1_FRAME 0x55
 #define DISC_FRAME 0x0B
 #define ESC 0x7D
 #define FLAG_ESC 0x5E
 #define ESC_ESC 0x5D
-#define MAX_SIZE (MAX_PAYLOAD_SIZE + 10)
+#define MAX_IFRAME_SIZE (MAX_PAYLOAD_SIZE * 2 + 6)
+
+enum flag{
+  starting = 0,
+  ack = 1,
+  rej = 2,
+  processing_data = 3,
+};
 
 enum state{
     start = 0,
@@ -42,15 +46,9 @@ enum state{
     bcc2_ok = 5,
     stop = 6,
     rejected = 7,
+    receiving_data = 8,
+    disc = 10,
 };
-
-typedef struct {
-  unsigned char control;
-  unsigned char sequence_number;
-  unsigned char l1;
-  unsigned char l2;
-  unsigned char data[MAX_PAYLOAD_SIZE]
-} dataPacket;
 
 
 #endif 

@@ -25,6 +25,8 @@ typedef struct
 #define FALSE 0
 #define TRUE 1
 
+
+
 // Open a connection using the "port" parameters defined in struct linkLayer.
 // Return "1" on success or "-1" on error.
 int llopen(LinkLayer connectionParameters);
@@ -41,5 +43,18 @@ int llread(unsigned char *packet);
 // if showStatistics == TRUE, link layer should print statistics in the console on close.
 // Return "1" on success or "-1" on error.
 int llclose(int showStatistics);
+
+int frameStateMachine(unsigned char address, unsigned char control);
+
+void alarmHandler(int signal);
+
+int stuffBytes(const unsigned char *input, int inputSize, unsigned char *output, unsigned char *bcc2);
+
+int readStuffedFrame(unsigned char *dataFrame, unsigned char *bcc2);
+
+void sendRR();
+
+void sendREJ();
+
 
 #endif // _LINK_LAYER_H_

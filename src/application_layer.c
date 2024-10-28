@@ -3,6 +3,10 @@
 #include "application_layer.h"
 #include "link_layer.h"
 #include "utils.h"
+#include <string.h>
+#include <stddef.h>
+#include <stdlib.h>
+
 
 void applicationLayer(const char *serialPort, const char *role, int baudRate,
                       int nTries, int timeout, const char *filename)
@@ -21,15 +25,21 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     linkData.timeout = timeout;
     
 
+    int open = llopen(linkData);
+    if (open == -1){
+        perror("Error on llopen. \n");
+        return;
+    }
+    else if (open == 1)
+        printf("llopen success. \n");
     
-    int dataLinkId = llopen(linkData);
     
     if (linkRole == LlTx){
 
         FILE *file = fopen(filename, "rb");
         if (file == NULL) {
             perror("Error opening file.");
-            return -1;
+            return;
         }
         // Start Control Packet
         int startControlPacketSize;
@@ -37,7 +47,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         unsigned char *startControlPacket = createControlPacket(START,filename,fileSize,&startControlPacketSize);
         if (llwrite(startControlPacket, startControlPacketSize) == -1){
             perror("Error writting start control packet.");
-            return -1;
+            return;
         }
 
         // Data Packets
@@ -64,29 +74,26 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 
         // End Control Packet
         int endControlPacketSize;
-        unsigned char *endControlPacket = createControlPacket(END, (unsigned char *)filename, fileSize, &endControlPacketSize);
+        unsigned char *endControlPacket = createControlPacket(END, filename, fileSize, &endControlPacketSize);
         if (llwrite(endControlPacket, endControlPacketSize) == -1) {
             perror("Error writing end control packet.");
             free(endControlPacket);
             fclose(file);
-            return -1;
+            return;
         }
 
         free(endControlPacket);
         fclose(file);
         printf("File sent successfully\n");
-        return 0;
     }
 
     else if (linkRole == LlRx){
         // Receiver logic
-        unsigned char receivedPacket[MAX_PAYLOAD_SIZE + 5];
-        int packetSize;
-
+        unsigned char receivedPacket[MAX_PAYLOAD_SIZE];
         FILE *outputFile = fopen(filename, "wb");
         if (outputFile == NULL) {
             perror("Error opening output file.");
-            return -1;
+            return;
         }
 
         while (1) {
@@ -111,15 +118,19 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                 printf("Received data packet with sequence number %d\n", sequenceNumber);
             } else if (controlField == END) {
                 printf("Received end control packet. File transfer complete.\n");
+                fclose(outputFile);
                 break;
             } else {
                 perror("Received unknown packet type.");
             }
-        }
-
-        fclose(outputFile);
-
+        } 
     }
+
+    if(llclose(TRUE) >= 0){
+            printf("Connection closed successfully.\n");
+            return;
+        }
+        else printf("Error closing connection. \n");
     
 }
 
@@ -135,7 +146,7 @@ unsigned char *createDataPacket(int sequenceNumber, unsigned char *data, int dat
     unsigned char *packet = (unsigned char *)malloc(*packetSize);
     if (packet == NULL) {
         perror("Failed to allocate memory for data packet");
-        return -1;
+        return NULL;
     }
 
     int index = 0;
@@ -148,14 +159,14 @@ unsigned char *createDataPacket(int sequenceNumber, unsigned char *data, int dat
     return packet;
 }
 
-unsigned char *createControlPacket(unsigned char controlField, unsigned char *fileName, long fileSize, int *packetSize) {
-    int fileNameLength = strlen((char *)fileName);
+unsigned char *createControlPacket(unsigned char controlField, const char *fileName, long fileSize, int *packetSize) {
+    int fileNameLength = strlen(fileName);
     int fileSizeLength = sizeof(fileSize);
     *packetSize = 1 + 2 + fileSizeLength + 2 + fileNameLength;
     unsigned char *packet = (unsigned char *)malloc(*packetSize);
     if (packet == NULL) {
         perror("Failed to allocate memory for control packet");
-        return -1;
+        return NULL;
     }
 
     int index = 0;

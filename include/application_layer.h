@@ -4,7 +4,7 @@
 #ifndef _APPLICATION_LAYER_H_
 #define _APPLICATION_LAYER_H_
 
-
+#include <stdio.h>
 
 // Application layer main function.
 // Arguments:
@@ -16,5 +16,11 @@
 //   filename: Name of the file to send / receive.
 void applicationLayer(const char *serialPort, const char *role, int baudRate,
                       int nTries, int timeout, const char *filename);
+
+long getFileSize(FILE *file);
+
+unsigned char *createDataPacket(int sequenceNumber, unsigned char *data, int dataSize, int *packetSize);
+
+unsigned char *createControlPacket(unsigned char controlField, const char *fileName, long fileSize, int *packetSize);
 
 #endif // _APPLICATION_LAYER_H_
