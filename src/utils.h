@@ -10,7 +10,7 @@
 
 // SIZE of maximum acceptable payload.
 // Maximum number of bytes that application layer should send to link layer
-#define MAX_PAYLOAD_SIZE 1000
+#define MAX_PAYLOAD_SIZE 100
 #define MAX_DATA_PER_PACKET (MAX_PAYLOAD_SIZE - 4)
 
 // Link layer macros
@@ -29,7 +29,7 @@
 #define ESC 0x7D
 #define FLAG_ESC 0x5E
 #define ESC_ESC 0x5D
-#define MAX_IFRAME_SIZE (MAX_PAYLOAD_SIZE * 2 + 6)
+#define MAX_IFRAME_SIZE (MAX_PAYLOAD_SIZE * 2 + 7)
 
 enum flag{
   starting = 0,

@@ -63,7 +63,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             if (dataPacket == NULL)
             {
                 perror("Error creating data packet");
-                break;
+                return;
             }
             int charsWritten = llwrite(dataPacket, packetSize);
 
@@ -71,11 +71,11 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             {
                 perror("Error writing data packet");
                 free(dataPacket);
-                break;
+                return;
             }
             else
             {
-                printf("Wrote %d bytes to llwrite. \n", charsWritten);
+                printf("llwrite wrote %d bytes. Application layer sent %d bytes to llwrite.\n", charsWritten, packetSize);
                 free(dataPacket);
                 sequence++;
             }
@@ -141,7 +141,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                 {
                     perror("Error writing data to output file");
                 }
-                printf("Received data packet with sequence number %d\n", sequenceNumber);
+                printf("Received data packet with sequence number %d. Data packet size = %d.\n", sequenceNumber, writtenBytes);
             }
             else if (controlField == END)
             {

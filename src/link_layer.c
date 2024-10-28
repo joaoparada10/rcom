@@ -119,8 +119,17 @@ int llwrite(const unsigned char *buf, int bufSize)
     printf("Payload size = %d \n", stuffedSize);
     memcpy(&frame[frameIndex], stuffedFrame, stuffedSize); // Data
     frameIndex += stuffedSize;
-    frame[frameIndex++] = bcc2;
-    printf("wrote bcc2 = 0x%02X \n", bcc2); // BCC2
+    if (bcc2 == FLAG){                    // BCC2
+        frame[frameIndex++] = ESC;
+        frame[frameIndex++] = FLAG_ESC;
+    }
+    else if (bcc2 == ESC){
+        frame[frameIndex++] = ESC;
+        frame[frameIndex++] = ESC_ESC;
+    }
+    else{
+        frame[frameIndex++] = bcc2;
+    }        
     frame[frameIndex++] = FLAG;             // FLAG
 
     (void)signal(SIGALRM, alarmHandler);
@@ -139,7 +148,6 @@ int llwrite(const unsigned char *buf, int bufSize)
             alarmEnabled = TRUE;
 
             enum flag response = frameStateMachine(TX_ADDRESS, RRFrame);
-            printf("response = %d \n", response);
             if (response == ack)
             {
                 alarm(0);
@@ -151,7 +159,7 @@ int llwrite(const unsigned char *buf, int bufSize)
             }
             else if (response == rej)
             {
-                printf("Received REJ, retransmitting.\n");
+                printf("Received REJ, retransmitting. BCC2 = 0x%02X.\n", bcc2);
                 alarmCount = 0;
                 alarm(0);
                 alarmEnabled = FALSE;
@@ -178,7 +186,7 @@ int llread(unsigned char *packet)
 {
     unsigned char bcc1 = 0;
     unsigned char IFrame = (frameCounter % 2 == 0) ? IFRAME_0 : IFRAME_1;
-    unsigned char dataFrame[MAX_PAYLOAD_SIZE + 1];
+    unsigned char dataFrame[MAX_PAYLOAD_SIZE+1];
     unsigned char bcc2 = 0;
     if (frameStateMachine(TX_ADDRESS, IFrame) == processing_data)
     {
@@ -191,10 +199,10 @@ int llread(unsigned char *packet)
                     printf("Invalid BCC1, header error. bcc1 = %x \n", bcc1);
                     sendREJ();
                     globalState = start;
-                    continue;
+                    if (frameStateMachine(TX_ADDRESS, IFrame) == processing_data)
+                        continue;
                 }
                 int dataFrameSize = readStuffedFrame(dataFrame, &bcc2);
-                printf("dataFrameSize = %d \n", dataFrameSize);
                 if (dataFrameSize > 0)
                 {
                     printf("Information Frame %d acknowledged. Sending RR signal.\n", frameCounter);
@@ -203,7 +211,12 @@ int llread(unsigned char *packet)
                     globalState = start;
                     return dataFrameSize;
                 }
-                else return dataFrameSize;
+                else if (dataFrameSize == -1){ 
+                    sendREJ();
+                    globalState = start;
+                    if (frameStateMachine(TX_ADDRESS, IFrame) == processing_data)
+                        continue;
+                }
             }
         }
     }
@@ -451,6 +464,7 @@ int readStuffedFrame(unsigned char *dataFrame, unsigned char *bcc2)
     int dataFrameIndex = 0;
     unsigned char byte;
     unsigned char prevbcc2 = 0;
+    *bcc2 = 0;
     while (1)
     {
 
@@ -458,17 +472,16 @@ int readStuffedFrame(unsigned char *dataFrame, unsigned char *bcc2)
         {
             if (byte == FLAG)
             {
-                *bcc2 = prevbcc2;
-                printf("Calculated bcc2 = 0x%02X \n Found bcc2 = 0x%02X", prevbcc2, dataFrame[dataFrameIndex - 1]);
                 if (prevbcc2 != dataFrame[dataFrameIndex - 1])
-                {
-                    perror("Invalid BCC2, data error.");
-                    sendREJ();
+                {   
+                    
+                    printf("Invalid BCC2, data error. Found BCC2 = 0x%02X. Calculated BCC2 = 0x%02X.\n", dataFrame[dataFrameIndex - 1],prevbcc2 );
                     globalState = start;
                     return -1;
                 }
+                *bcc2 = prevbcc2;
                 dataFrameIndex -= 1; // need to remove BCC2 from buffer
-                printf("Found flag at the end of payload. Payload size = %d", dataFrameIndex);
+                printf("Found flag at the end of payload. Payload size = %d. \n", dataFrameIndex);
                 return dataFrameIndex;
             }
             if (byte == ESC)
@@ -489,9 +502,16 @@ int readStuffedFrame(unsigned char *dataFrame, unsigned char *bcc2)
                     *bcc2 ^= ESC;
                     dataFrame[dataFrameIndex++] = ESC;
                 }
+                else if ((byte == FLAG) && (dataFrameIndex == MAX_PAYLOAD_SIZE) && (*bcc2 == ESC))  // specific case where BCC2 is == ESC
+                {   
+                    dataFrameIndex -= 1; // need to remove BCC2 from buffer
+                    printf("Found flag at the end of payload. Payload size = %d. SPECIFIC CASE! \n", dataFrameIndex);
+                    return dataFrameIndex;
+                }
                 else
                 {
-                    perror("Invalid byte stuffing sequence");
+                    
+                    printf("Invalid byte stuffing sequence. Got 0x%02X after ESC. Index = %d. PREV BCC2 = 0x%02X.  BCC2 = 0x%02X.\n", byte, dataFrameIndex, prevbcc2, *bcc2);
                     return -1;
                 }
                 
