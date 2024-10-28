@@ -7,15 +7,14 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-
 void applicationLayer(const char *serialPort, const char *role, int baudRate,
                       int nTries, int timeout, const char *filename)
 {
     LinkLayerRole linkRole;
     if (strcmp(role, "tx") == 0)
         linkRole = LlTx;
-    else linkRole = LlRx;
-
+    else
+        linkRole = LlRx;
 
     LinkLayer linkData;
     strcpy(linkData.serialPort, serialPort);
@@ -23,59 +22,70 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     linkData.baudRate = baudRate;
     linkData.nRetransmissions = nTries;
     linkData.timeout = timeout;
-    
 
     int open = llopen(linkData);
-    if (open == -1){
+    if (open == -1)
+    {
         perror("Error on llopen. \n");
         return;
     }
     else if (open == 1)
         printf("llopen success. \n");
-    
-    
-    if (linkRole == LlTx){
+
+    if (linkRole == LlTx)
+    {
 
         FILE *file = fopen(filename, "rb");
-        if (file == NULL) {
+        if (file == NULL)
+        {
             perror("Error opening file.");
             return;
         }
         // Start Control Packet
         int startControlPacketSize;
         long fileSize = getFileSize(file);
-        unsigned char *startControlPacket = createControlPacket(START,filename,fileSize,&startControlPacketSize);
-        if (llwrite(startControlPacket, startControlPacketSize) == -1){
+        unsigned char *startControlPacket = createControlPacket(START, filename, fileSize, &startControlPacketSize);
+        if (llwrite(startControlPacket, startControlPacketSize) == -1)
+        {
             perror("Error writting start control packet.");
             return;
         }
 
         // Data Packets
-        unsigned char buffer[MAX_PAYLOAD_SIZE];
+        unsigned char buffer[MAX_DATA_PER_PACKET];
         int bytesRead;
         int sequence = 0;
-        while ((bytesRead = fread(buffer, 1, MAX_PAYLOAD_SIZE, file)) > 0) {
+        while ((bytesRead = fread(buffer, 1, MAX_DATA_PER_PACKET, file)) > 0)
+        {
             int packetSize;
             unsigned char *dataPacket = createDataPacket(sequence, buffer, bytesRead, &packetSize);
-            
-            if (dataPacket == NULL) {
+
+            if (dataPacket == NULL)
+            {
                 perror("Error creating data packet");
                 break;
             }
+            int charsWritten = llwrite(dataPacket, packetSize);
 
-            if (llwrite(dataPacket, packetSize) == -1) {
+            if (charsWritten == -1)
+            {
                 perror("Error writing data packet");
-                free(dataPacket); 
+                free(dataPacket);
                 break;
             }
-            free(dataPacket);
-            sequence++;
+            else
+            {
+                printf("Wrote %d bytes to llwrite. \n", charsWritten);
+                free(dataPacket);
+                sequence++;
+            }
         }
 
         // End Control Packet
         int endControlPacketSize;
         unsigned char *endControlPacket = createControlPacket(END, filename, fileSize, &endControlPacketSize);
-        if (llwrite(endControlPacket, endControlPacketSize) == -1) {
+        if (llwrite(endControlPacket, endControlPacketSize) == -1)
+        {
             perror("Error writing end control packet.");
             free(endControlPacket);
             fclose(file);
@@ -85,66 +95,89 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         free(endControlPacket);
         fclose(file);
         printf("File sent successfully\n");
+        if (llclose(TRUE) >= 0)
+        {
+            printf("Connection closed successfully.\n");
+            return;
+        }
+        else
+            printf("Error closing connection. \n");
+        return;
     }
 
-    else if (linkRole == LlRx){
+    else if (linkRole == LlRx)
+    {
         // Receiver logic
         unsigned char receivedPacket[MAX_PAYLOAD_SIZE];
         FILE *outputFile = fopen(filename, "wb");
-        if (outputFile == NULL) {
+        if (outputFile == NULL)
+        {
             perror("Error opening output file.");
             return;
         }
 
-        while (1) {
-            if (llread(receivedPacket) < 0) {
+        while (1)
+        {
+            if (llread(receivedPacket) < 0)
+            {
                 perror("Error reading packet");
                 break;
             }
 
             unsigned char controlField = receivedPacket[0];
-            if (controlField == START) {
+            if (controlField == START)
+            {
                 printf("Received start control packet.\n");
-            } else if (controlField == DATA) {
+            }
+            else if (controlField == DATA)
+            {
                 int sequenceNumber = receivedPacket[1];
                 int L2 = receivedPacket[2];
                 int L1 = receivedPacket[3];
                 int dataLength = (L2 << 8) | L1;
                 unsigned char *data = &receivedPacket[4];
                 int writtenBytes = fwrite(data, 1, dataLength, outputFile);
-                if (writtenBytes < dataLength) {
+                if (writtenBytes < dataLength)
+                {
                     perror("Error writing data to output file");
                 }
                 printf("Received data packet with sequence number %d\n", sequenceNumber);
-            } else if (controlField == END) {
+            }
+            else if (controlField == END)
+            {
                 printf("Received end control packet. File transfer complete.\n");
                 fclose(outputFile);
-                break;
-            } else {
+                if (llclose(TRUE) >= 0)
+                {
+                    printf("Connection closed successfully.\n");
+                    return;
+                }
+                else
+                    printf("Error closing connection. \n");
+                return;
+            }
+            else
+            {
                 perror("Received unknown packet type.");
             }
-        } 
-    }
-
-    if(llclose(TRUE) >= 0){
-            printf("Connection closed successfully.\n");
-            return;
         }
-        else printf("Error closing connection. \n");
-    
+    }
 }
 
-long getFileSize(FILE *file){
+long getFileSize(FILE *file)
+{
     fseek(file, 0, SEEK_END);
     long fileSize = ftell(file);
     fseek(file, 0, SEEK_SET);
     return fileSize;
 }
 
-unsigned char *createDataPacket(int sequenceNumber, unsigned char *data, int dataSize, int *packetSize) {
-    *packetSize = 1 + 1 + 2 + dataSize;  // Control field + Sequence number + L2, L1 + Data
+unsigned char *createDataPacket(int sequenceNumber, unsigned char *data, int dataSize, int *packetSize)
+{
+    *packetSize = 1 + 1 + 2 + dataSize; // Control field + Sequence number + L2, L1 + Data
     unsigned char *packet = (unsigned char *)malloc(*packetSize);
-    if (packet == NULL) {
+    if (packet == NULL)
+    {
         perror("Failed to allocate memory for data packet");
         return NULL;
     }
@@ -152,19 +185,21 @@ unsigned char *createDataPacket(int sequenceNumber, unsigned char *data, int dat
     int index = 0;
     packet[index++] = DATA;
     packet[index++] = sequenceNumber % 100;
-    packet[index++] = dataSize / 256;  // L2: High byte of data length
-    packet[index++] = dataSize % 256;  // L1: Low byte of data length
+    packet[index++] = dataSize / 256; // L2: High byte of data length
+    packet[index++] = dataSize % 256; // L1: Low byte of data length
     memcpy(&packet[index], data, dataSize);
-    
+
     return packet;
 }
 
-unsigned char *createControlPacket(unsigned char controlField, const char *fileName, long fileSize, int *packetSize) {
+unsigned char *createControlPacket(unsigned char controlField, const char *fileName, long fileSize, int *packetSize)
+{
     int fileNameLength = strlen(fileName);
     int fileSizeLength = sizeof(fileSize);
     *packetSize = 1 + 2 + fileSizeLength + 2 + fileNameLength;
     unsigned char *packet = (unsigned char *)malloc(*packetSize);
-    if (packet == NULL) {
+    if (packet == NULL)
+    {
         perror("Failed to allocate memory for control packet");
         return NULL;
     }

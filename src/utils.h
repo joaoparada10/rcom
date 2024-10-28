@@ -11,6 +11,7 @@
 // SIZE of maximum acceptable payload.
 // Maximum number of bytes that application layer should send to link layer
 #define MAX_PAYLOAD_SIZE 1000
+#define MAX_DATA_PER_PACKET (MAX_PAYLOAD_SIZE - 4)
 
 // Link layer macros
 #define FLAG 0x7E
