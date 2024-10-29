@@ -52,9 +52,12 @@ int stuffBytes(const unsigned char *input, int inputSize, unsigned char *output,
 
 int readStuffedFrame(unsigned char *dataFrame, unsigned char *bcc2);
 
-void sendRR();
+int sendRR(int discard);
 
-void sendREJ();
+int sendREJ();
+
+int sendSupervisionFrame(unsigned char control);
+
 
 
 #endif // _LINK_LAYER_H_

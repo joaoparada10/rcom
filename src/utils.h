@@ -10,7 +10,7 @@
 
 // SIZE of maximum acceptable payload.
 // Maximum number of bytes that application layer should send to link layer
-#define MAX_PAYLOAD_SIZE 100
+#define MAX_PAYLOAD_SIZE 1000
 #define MAX_DATA_PER_PACKET (MAX_PAYLOAD_SIZE - 4)
 
 // Link layer macros
@@ -36,6 +36,7 @@ enum flag{
   ack = 1,
   rej = 2,
   processing_data = 3,
+  discard = 4,
 };
 
 enum state{
