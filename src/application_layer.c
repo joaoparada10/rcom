@@ -26,11 +26,11 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     int open = llopen(linkData);
     if (open == -1)
     {
-        printf("Error on llopen. \n");
+        printf("APP: Error on llopen. \n");
         return;
     }
     else if (open == 1)
-        printf("llopen success. \n");
+        printf("APP: llopen success. \n");
 
     if (linkRole == LlTx)
     {
@@ -38,7 +38,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         FILE *file = fopen(filename, "rb");
         if (file == NULL)
         {
-            printf("Error opening file.\n");
+            printf("APP: Error opening file.\n");
             return;
         }
         // Start Control Packet
@@ -47,7 +47,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         unsigned char *startControlPacket = createControlPacket(START, filename, fileSize, &startControlPacketSize);
         if (llwrite(startControlPacket, startControlPacketSize) == -1)
         {
-            printf("Error writting start control packet.\n");
+            printf("APP: Error writting start control packet.\n");
             return;
         }
 
@@ -55,6 +55,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         unsigned char buffer[MAX_DATA_PER_PACKET];
         int bytesRead;
         int sequence = 0;
+        size_t totalBytesSent = 0;
         while ((bytesRead = fread(buffer, 1, MAX_DATA_PER_PACKET, file)) > 0)
         {
             int packetSize;
@@ -62,20 +63,22 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 
             if (dataPacket == NULL)
             {
-                printf("Error creating data packet.\n");
+                printf("APP: Error creating data packet.\n");
                 return;
             }
             int charsWritten = llwrite(dataPacket, packetSize);
 
             if (charsWritten == -1)
             {
-                printf("Error writing data packet.\n");
+                printf("APP: Error writing data packet. File transfer unsuccessful.\n");
                 free(dataPacket);
                 return;
             }
             else
             {
-                printf("llwrite wrote %d bytes. Application layer sent %d bytes to llwrite.\n", charsWritten, packetSize);
+                totalBytesSent += bytesRead;
+                float progress = (float)totalBytesSent / fileSize;
+                printProgressBar(progress);
                 free(dataPacket);
                 sequence++;
             }
@@ -86,22 +89,25 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         unsigned char *endControlPacket = createControlPacket(END, filename, fileSize, &endControlPacketSize);
         if (llwrite(endControlPacket, endControlPacketSize) == -1)
         {
-            printf("Error writing end control packet.\n");
+            printf("APP: Error writing end control packet.\n");
             free(endControlPacket);
             fclose(file);
             return;
         }
 
+        printProgressBar(1.0);
+        printf("\n");
+
         free(endControlPacket);
         fclose(file);
-        printf("File sent successfully\n");
+        printf("APP: File sent successfully\n");
         if (llclose(TRUE) >= 0)
         {
-            printf("Connection closed successfully.\n");
+            printf("APP: Connection closed successfully.\n");
             return;
         }
         else
-            printf("Error closing connection. \n");
+            printf("APP: Error closing connection. \n");
         return;
     }
 
@@ -112,7 +118,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         FILE *outputFile = fopen(filename, "wb");
         if (outputFile == NULL)
         {
-            printf("Error opening output file.\n");
+            printf("APP: Error opening output file.\n");
             return;
         }
 
@@ -120,14 +126,14 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         {
             if (llread(receivedPacket) < 0)
             {
-                printf("Error reading packet.\n");
-                break;
+                printf("APP: Error reading packet. File transfer unsuccessful.\n");
+                return;
             }
 
             unsigned char controlField = receivedPacket[0];
             if (controlField == START)
             {
-                printf("Received start control packet.\n");
+                printf("APP: Received start control packet.\n");
             }
             else if (controlField == DATA)
             {
@@ -139,26 +145,26 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                 int writtenBytes = fwrite(data, 1, dataLength, outputFile);
                 if (writtenBytes < dataLength)
                 {
-                    printf("Error writing data to output file.\n");
+                    printf("APP: Error writing data to output file.\n");
                 }
-                printf("Received data packet with sequence number %d. Data packet size = %d.\n", sequenceNumber, writtenBytes);
+                printf("APP: Received data packet with sequence number %d. Data packet size = %d.\n", sequenceNumber, writtenBytes);
             }
             else if (controlField == END)
             {
-                printf("Received end control packet. File transfer complete.\n");
+                printf("APP: Received end control packet. File transfer complete.\n");
                 fclose(outputFile);
                 if (llclose(TRUE) >= 0)
                 {
-                    printf("Connection closed successfully.\n");
+                    printf("APP: Connection closed successfully.\n");
                     return;
                 }
                 else
-                    printf("Error closing connection. \n");
+                    printf("APP: Error closing connection. \n");
                 return;
             }
             else
             {
-                printf("Received unknown packet type.\n");
+                printf("APP: Received unknown packet type.\n");
             }
         }
     }
@@ -178,7 +184,7 @@ unsigned char *createDataPacket(int sequenceNumber, unsigned char *data, int dat
     unsigned char *packet = (unsigned char *)malloc(*packetSize);
     if (packet == NULL)
     {
-        printf("Failed to allocate memory for data packet.\n");
+        printf("APP: Failed to allocate memory for data packet.\n");
         return NULL;
     }
 
@@ -200,7 +206,7 @@ unsigned char *createControlPacket(unsigned char controlField, const char *fileN
     unsigned char *packet = (unsigned char *)malloc(*packetSize);
     if (packet == NULL)
     {
-        printf("Failed to allocate memory for control packet.\n");
+        printf("APP: Failed to allocate memory for control packet.\n");
         return NULL;
     }
 
@@ -216,4 +222,17 @@ unsigned char *createControlPacket(unsigned char controlField, const char *fileN
     index += fileNameLength;
 
     return packet;
+}
+
+void printProgressBar(float progress) {
+    int barWidth = 50;
+    printf("\r[");
+    int pos = barWidth * progress;
+    for (int i = 0; i < barWidth; ++i) {
+        if (i < pos) printf("=");
+        else if (i == pos) printf(">");
+        else printf(" ");
+    }
+    printf("] %d%%", (int)(progress * 100));
+    fflush(stdout);
 }

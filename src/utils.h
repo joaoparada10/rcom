@@ -37,6 +37,8 @@ enum flag{
   rej = 2,
   processing_data = 3,
   discard = 4,
+  disconnect = 5,
+  timeout = 6,
 };
 
 enum state{

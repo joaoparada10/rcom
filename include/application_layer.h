@@ -23,4 +23,6 @@ unsigned char *createDataPacket(int sequenceNumber, unsigned char *data, int dat
 
 unsigned char *createControlPacket(unsigned char controlField, const char *fileName, long fileSize, int *packetSize);
 
+void printProgressBar(float progress);
+
 #endif // _APPLICATION_LAYER_H_

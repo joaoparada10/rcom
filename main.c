@@ -7,8 +7,8 @@
 
 #include "application_layer.h"
 
-#define N_TRIES 3
-#define TIMEOUT 5
+#define N_TRIES 5
+#define TIMEOUT 3
 
 
 // Arguments:
