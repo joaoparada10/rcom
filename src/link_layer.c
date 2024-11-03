@@ -55,17 +55,19 @@ int llopen(LinkLayer connectionParameters)
             if (alarmEnabled == FALSE)
             {
                 sendSupervisionFrame(SET_FRAME);
+                printf("Sent SET Frame.\n");
                 alarm(globalConnectionParameters.timeout);
                 alarmEnabled = TRUE;
                 enum flag response = frameStateMachine(TX_ADDRESS, UA_FRAME);
                 if (response == ack)
                 {
+                    printf("Received UA Frame. llopen success.\n");
                     alarm(0);
                     return 1;
                 }
                 else if (response == disconnect || response == rej)
                 {
-                    //printf("Error: Receiver in the middle of file transfer. Terminating...\n");
+                    printf("Error: Receiver in the middle of file transfer. Terminating...\n");
                     return -1;
                 }
                 
@@ -73,17 +75,17 @@ int llopen(LinkLayer connectionParameters)
                 {
                     alarmTriggered = FALSE; // Reset flag
                     alarmEnabled = FALSE;
-                    //printf("Retransmitting after timeout.\n");
+                    printf("Retransmitting after timeout.\n");
                 }
                 else
                 {
-                    //printf("Received invalid answer. Retransmitting.\n");
+                    printf("Received invalid answer. Retransmitting.\n");
                     numberRetransmitions++;
                     continue;
                 }
             }
         }
-        //printf("Didn't get receiver response after %d retransmissions. Exiting.\n", alarmCount);
+        printf("Didn't get receiver response after %d retransmissions. Exiting.\n", alarmCount);
     }
     return -1;
 }
@@ -104,7 +106,7 @@ int llwrite(const unsigned char *buf, int bufSize)
     frame[frameIndex++] = TX_ADDRESS ^ C;                  // BCC1
 
     int stuffedSize = stuffBytes(buf, bufSize, stuffedFrame, &bcc2);
-    //printf("Payload size = %d \n", stuffedSize);
+    printf("Stuffed Payload size = %d \n", stuffedSize);
     memcpy(&frame[frameIndex], stuffedFrame, stuffedSize); // Data
     frameIndex += stuffedSize;
     if (bcc2 == FLAG) 
@@ -134,7 +136,7 @@ int llwrite(const unsigned char *buf, int bufSize)
         {
             unsigned char RRFrame = (frameCounter % 2 == 0) ? RR1_FRAME : RR0_FRAME;
             bytesWritten = writeBytes((char *)frame, frameIndex);
-            //printf("%d bytes written\n", bytesWritten);
+            printf("%d bytes written\n", bytesWritten);
             alarm(globalConnectionParameters.timeout);
             alarmEnabled = TRUE;
 
@@ -143,13 +145,13 @@ int llwrite(const unsigned char *buf, int bufSize)
             {
                 alarm(0);
                 alarmEnabled = FALSE;
-                //printf("Received ACK. FRAME NUMBER = %d \n", frameCounter);
+                printf("Received ACK. FRAME NUMBER = %d \n", frameCounter % 2);
                 frameCounter++;
                 return stuffedSize;
             }
             else if (response == rej)
             {
-                //printf("Received REJ, retransmitting. BCC2 = 0x%02X. FRAME NUMBER = %d\n", bcc2, frameCounter);
+                printf("Received REJ, retransmitting. BCC2 = 0x%02X. FRAME NUMBER = %d\n", bcc2, frameCounter % 2);
                 alarmCount = 0;
                 alarm(0);
                 alarmEnabled = FALSE;
@@ -158,18 +160,18 @@ int llwrite(const unsigned char *buf, int bufSize)
             }
             else if (response == disconnect)
             {
-                //printf("Received premature disconnect, error occured. Terminating...\n");
+                printf("Received premature disconnect, error occured. Terminating...\n");
                 return -1;
             }
             if (alarmTriggered)
             {
                 alarmTriggered = FALSE;
                 alarmEnabled = FALSE;
-                //printf("Retransmitting after timeout. FRAME NUMBER = %d\n", frameCounter);
+                printf("Retransmitting after timeout. FRAME NUMBER = %d\n", frameCounter % 2);
             }
         }
     }
-    //printf("Didn't get receiver response after %d retransmissions. Exiting.\n", alarmCount);
+    printf("Didn't get receiver response after %d retransmissions. Exiting.\n", alarmCount);
     return -1;
 }
 
@@ -188,14 +190,14 @@ int llread(unsigned char *packet)
     {
         if (status == ack)
         {
-            //printf("Received SET Duplicate. Retransmitting UA FRAME. \n");
+            printf("Received SET Duplicate. Retransmitting UA FRAME. \n");
             sendSupervisionFrame(UA_FRAME);
             status = frameStateMachine(TX_ADDRESS, IFrame);
             continue;
         }
         else if (status == disconnect)
         {
-            //printf("Received SET Frame in the middle of a transfer. Error occurred, terminating... \n");
+            printf("Received SET Frame in the middle of a transfer. Error occurred, terminating... \n");
             sendSupervisionFrame(DISC_FRAME);
             return -1;
         }
@@ -203,7 +205,7 @@ int llread(unsigned char *packet)
         {
             if (bcc1 != (TX_ADDRESS ^ IFRAME_0) && bcc1 != (TX_ADDRESS ^ IFRAME_1))
             {
-                //printf("Invalid BCC1, header error. bcc1 = %x \n", bcc1);
+                printf("Invalid BCC1, header error. bcc1 = %x \n", bcc1);
                 sendREJ();
                 status = frameStateMachine(TX_ADDRESS, IFrame);
                 continue;
@@ -213,14 +215,14 @@ int llread(unsigned char *packet)
 
             if (status == discard)
             {
-                //printf("Received Duplicate Information Frame %d. Retransmitting RR FRAME.\n", frameCounter - 1);
+                printf("Received Duplicate Information Frame %d. Retransmitting RR FRAME.\n", (frameCounter - 1) % 2);
                 sendRR(TRUE);
                 status = frameStateMachine(TX_ADDRESS, IFrame);
                 continue;
             }
             else if (dataFrameSize > 0)
             {
-                //printf("Information Frame %d acknowledged. Sending RR FRAME.\n", frameCounter);
+                printf("Information Frame %d acknowledged. Sending RR FRAME.\n", frameCounter % 2);
                 memcpy(packet, dataFrame, dataFrameSize);
                 sendRR(FALSE);
                 return dataFrameSize;
@@ -249,22 +251,22 @@ int llclose(int showStatistics)
         if (status == ack)
         {
             sendSupervisionFrame(DISC_FRAME);
-            //printf("llclose receiver wrote disc frame.\n");
+            printf("llclose receiver wrote disc frame.\n");
             if (frameStateMachine(TX_ADDRESS, UA_FRAME) == ack)
             {
-                //printf("Statistics: \n Frames transmitted = %d \n Number of retransmissions = %d \n Number of timeouts = %d \n", frameCounter, numberRetransmitions, numberTimeouts);
+                printf("Statistics: \n Frames received = %d \n", frameCounter);
                 clstat = closeSerialPort();
                 return clstat;
             }
             else
             {
-                //printf("Error: Invalid UA Frame. Terminating...\n");
+                printf("Error: Invalid UA Frame. Terminating...\n");
                 return -1;
             }
         }
         else
         {
-            //printf("Error: Invalid DISC Frame. Terminating...\n");
+            printf("Error: Invalid DISC Frame. Terminating...\n");
             return -1;
         }
     }
@@ -279,14 +281,14 @@ int llclose(int showStatistics)
             if (alarmEnabled == FALSE)
             {
                 sendSupervisionFrame(DISC_FRAME);
-                //printf("llclose wrote disc frame.\n");
+                printf("llclose wrote disc frame.\n");
                 alarm(globalConnectionParameters.timeout);
                 alarmEnabled = TRUE;
                 if (frameStateMachine(TX_ADDRESS, DISC_FRAME) == ack)
                 {
                     alarm(0);
                     sendSupervisionFrame(UA_FRAME);
-                    //printf("Statistics: \n Frames transmitted = %d \n Number of retransmissions = %d \n Number of timeouts = %d \n", frameCounter, numberRetransmitions, numberTimeouts);
+                    printf("Statistics: \n Frames transmitted = %d \n Number of retransmissions = %d \n Number of timeouts = %d \n", frameCounter, numberRetransmitions, numberTimeouts);
                     clstat = closeSerialPort();
                     return clstat;
                 }
@@ -294,7 +296,7 @@ int llclose(int showStatistics)
                 {
                     alarmTriggered = FALSE;
                     alarmEnabled = FALSE;
-                    //printf("Retransmitting after timeout.\n");
+                    printf("Retransmitting after timeout.\n");
                 }
             }
         }
@@ -311,13 +313,13 @@ int frameStateMachine(unsigned char address, unsigned char control)
     {
         if (alarmTriggered)
         {
-            //printf("Timeout in frameStateMachine\n");
+            printf("Timeout in frameStateMachine\n");
             numberTimeouts++;
             return timeout;
         }
         if (readByte((char *)&byte) == 1)
         {
-            // //printf ("byte = 0x%02X\n control = 0x%02X\n", byte, control);
+           
             switch (globalState)
             {
             case start:
@@ -435,7 +437,6 @@ int frameStateMachine(unsigned char address, unsigned char control)
             }
         }
     }
-    //printf("response = %d \n", response);
     return response;
 }
 
@@ -444,7 +445,7 @@ void alarmHandler(int signal)
     alarmTriggered = TRUE;
     alarmCount++;
 
-    //printf("Alarm #%d triggered\n", alarmCount);
+    printf("Alarm #%d triggered\n", alarmCount);
 }
 
 int stuffBytes(const unsigned char *input, int inputSize, unsigned char *output, unsigned char *bcc2)
@@ -492,12 +493,12 @@ int readStuffedFrame(unsigned char *dataFrame, unsigned char *bcc2)
                 if (prevbcc2 != prevbyte)
                 {
 
-                    //printf("Invalid BCC2, data error. Found BCC2 = 0x%02X. Calculated BCC2 = 0x%02X.\n", prevbyte, prevbcc2);
+                    printf("Invalid BCC2, data error. Found BCC2 = 0x%02X. Calculated BCC2 = 0x%02X.\n", prevbyte, prevbcc2);
                     return -1;
                 }
 
                 *bcc2 = prevbcc2;
-                //printf("Found flag at the end of payload. Payload size = %d. \n Found BCC2 = 0x%02X. Calculated BCC2 = 0x%02X.\n", dataFrameIndex, prevbyte, prevbcc2);
+                // printf("Found flag at the end of payload. Payload size = %d. \n" , dataFrameIndex);
                 return dataFrameIndex;
             }
             if (byte == ESC)
@@ -524,13 +525,13 @@ int readStuffedFrame(unsigned char *dataFrame, unsigned char *bcc2)
                 }
                 else if ((byte == FLAG) && (dataFrameIndex == MAX_PAYLOAD_SIZE) && (*bcc2 == ESC)) // specific case where BCC2 is == ESC
                 {
-                    //printf("Found flag at the end of payload. Payload size = %d. SPECIFIC CASE! \n", dataFrameIndex + 1);
+                    printf("Found flag at the end of payload. Payload size = %d. SPECIFIC CASE! \n", dataFrameIndex + 1);
                     return dataFrameIndex;
                 }
                 else
                 {
 
-                    //printf("Invalid byte stuffing sequence. Got 0x%02X after ESC. Index = %d. PREV BCC2 = 0x%02X.  BCC2 = 0x%02X.\n", byte, dataFrameIndex, prevbcc2, *bcc2);
+                    printf("Invalid byte stuffing sequence. Got 0x%02X after ESC. Index = %d. PREV BCC2 = 0x%02X.  BCC2 = 0x%02X.\n", byte, dataFrameIndex, prevbcc2, *bcc2);
                     return -1;
                 }
             }

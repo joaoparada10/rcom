@@ -13,10 +13,10 @@ CABLE_DIR = cable/
 TX_SERIAL_PORT = /dev/ttyS10
 RX_SERIAL_PORT = /dev/ttyS11
 
-BAUD_RATE = 19200
+BAUD_RATE = 9600
 
-TX_FILE = paulie.png
-RX_FILE = paulie-received.png
+TX_FILE = penguin.gif
+RX_FILE = penguin-received.gif
 
 # Targets
 .PHONY: all

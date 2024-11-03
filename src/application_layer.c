@@ -76,12 +76,13 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             }
             else
             {
-                totalBytesSent += bytesRead;
-                float progress = (float)totalBytesSent / fileSize;
-                printProgressBar(progress);
+                
                 free(dataPacket);
                 sequence++;
             }
+            totalBytesSent += bytesRead;
+            float progress = (float)totalBytesSent / fileSize;
+            printProgressBar(progress);
         }
 
         // End Control Packet
@@ -233,6 +234,6 @@ void printProgressBar(float progress) {
         else if (i == pos) printf(">");
         else printf(" ");
     }
-    printf("] %d%%", (int)(progress * 100));
+    printf("] %d%% \n", (int)(progress * 100));
     fflush(stdout);
 }
